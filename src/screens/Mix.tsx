@@ -19,7 +19,12 @@ export function MixScreen() {
         : MIX_TABLE[[mixA, mixB].sort().join('+')]
       : null
 
-  const lightResult = result && /white|yellow|cream|light blue|pink/i.test(result.name)
+  // Pick banner text color by how light the mixed color actually is.
+  const isLight = (hex: string) => {
+    const n = parseInt(hex.slice(1), 16)
+    return 0.299 * (n >> 16) + 0.587 * ((n >> 8) & 0xff) + 0.114 * (n & 0xff) > 165
+  }
+  const lightResult = result && isLight(result.hex)
 
   const pickPaint = (name: string) => {
     if (!mixA) setMixA(name)

@@ -188,6 +188,93 @@ function softballRegions(): Region[] {
   ]
 }
 
+/** Big butterfly with spotted wings. */
+function butterflyRegions(): Region[] {
+  return [
+    { id: 'bg', d: rect(4, 4, 892, 592) },
+    { id: 'sun', d: circ(105, 95, 50) },
+    { id: 'grass', d: rect(4, 510, 892, 86) },
+    { id: 'wingUL', d: ell(310, 240, 125, 95) },
+    { id: 'wingUR', d: ell(590, 240, 125, 95) },
+    { id: 'wingLL', d: ell(330, 410, 100, 80) },
+    { id: 'wingLR', d: ell(570, 410, 100, 80) },
+    { id: 'spotUL', d: circ(310, 240, 35) },
+    { id: 'spotUR', d: circ(590, 240, 35) },
+    { id: 'spotLL', d: circ(330, 410, 28) },
+    { id: 'spotLR', d: circ(570, 410, 28) },
+    { id: 'body', d: ell(450, 300, 26, 120) },
+    { id: 'head', d: circ(450, 155, 30) },
+    { id: 'antL', d: circ(418, 98, 12) },
+    { id: 'antR', d: circ(482, 98, 12) },
+  ]
+}
+
+/** Rocket blasting through space — stars, a ringed planet, and the moon. */
+function rocketRegions(): Region[] {
+  return [
+    { id: 'bg', d: rect(4, 4, 892, 592) },
+    { id: 'star1', d: star(150, 120, 26, 11) },
+    { id: 'star2', d: star(760, 90, 22, 9) },
+    { id: 'star3', d: star(680, 480, 24, 10) },
+    { id: 'ring', d: ell(180, 450, 85, 20) },
+    { id: 'planet', d: circ(180, 450, 55) },
+    { id: 'moon', d: circ(790, 200, 40) },
+    { id: 'flame', d: ell(450, 500, 28, 45) },
+    { id: 'body', d: rect(390, 220, 120, 220) },
+    { id: 'nose', d: tri(390, 220, 510, 220, 450, 110) },
+    { id: 'finL', d: tri(390, 440, 390, 510, 330, 510) },
+    { id: 'finR', d: tri(510, 440, 510, 510, 570, 510) },
+    { id: 'window', d: circ(450, 290, 32) },
+  ]
+}
+
+/** Two fish, bubbles, seaweed, and a starfish on the sea floor. */
+function seaRegions(): Region[] {
+  return [
+    { id: 'bg', d: rect(4, 4, 892, 592) },
+    { id: 'bubble1', d: circ(200, 120, 18) },
+    { id: 'bubble2', d: circ(245, 75, 12) },
+    { id: 'bubble3', d: circ(700, 150, 16) },
+    { id: 'weedL', d: ell(120, 500, 18, 90) },
+    { id: 'weedR', d: ell(170, 520, 16, 70) },
+    { id: 'sand', d: rect(4, 530, 892, 66) },
+    { id: 'fishTail', d: tri(520, 300, 610, 240, 610, 360) },
+    { id: 'fishBody', d: ell(400, 300, 130, 80) },
+    { id: 'fishEye', d: circ(330, 280, 14) },
+    { id: 'smallTail', d: tri(735, 420, 780, 395, 780, 445) },
+    { id: 'smallBody', d: ell(680, 420, 60, 38) },
+    { id: 'starfish', d: star(790, 550, 35, 15) },
+  ]
+}
+
+/** Triple-scoop ice cream cone with a cherry on top. */
+function iceCreamRegions(): Region[] {
+  return [
+    { id: 'bg', d: rect(4, 4, 892, 592) },
+    { id: 'sun', d: circ(110, 95, 50) },
+    { id: 'cloud', d: ell(760, 100, 80, 34) },
+    { id: 'cone', d: tri(370, 330, 530, 330, 450, 560) },
+    { id: 'scoop1', d: circ(450, 295, 90) },
+    { id: 'scoop2', d: circ(450, 185, 75) },
+    { id: 'cherry', d: circ(450, 90, 26) },
+  ]
+}
+
+/** Hot air balloon drifting between the clouds. */
+function balloonRegions(): Region[] {
+  return [
+    { id: 'bg', d: rect(4, 4, 892, 592) },
+    { id: 'cloudL', d: ell(150, 140, 80, 35) },
+    { id: 'cloudR', d: ell(760, 110, 75, 32) },
+    { id: 'grass', d: rect(4, 540, 892, 56) },
+    { id: 'skirt', d: quad(415, 455, 485, 455, 510, 365, 390, 365) },
+    { id: 'balloon', d: circ(450, 220, 150) },
+    { id: 'stripeMid', d: ell(450, 220, 105, 150) },
+    { id: 'stripeCenter', d: ell(450, 220, 55, 150) },
+    { id: 'basket', d: rect(410, 450, 80, 60) },
+  ]
+}
+
 export const PAGES: ColoringPage[] = [
   { label: 'Flower', regions: flowerRegions() },
   { label: 'House', regions: houseRegions() },
@@ -197,4 +284,9 @@ export const PAGES: ColoringPage[] = [
   { label: 'Rainbow', regions: rainbowRegions() },
   { label: 'Castle', regions: castleRegions() },
   { label: 'Softball', regions: softballRegions() },
+  { label: 'Butterfly', regions: butterflyRegions() },
+  { label: 'Rocket', regions: rocketRegions() },
+  { label: 'Under the Sea', regions: seaRegions() },
+  { label: 'Ice Cream', regions: iceCreamRegions() },
+  { label: 'Balloon', regions: balloonRegions() },
 ]
