@@ -11,6 +11,12 @@ A kids' color-learning and creativity website (toddlers through ~10), built from
   painting on a canvas overlay. Fills and brush layers persist per page.
 - **Free Draw & Stickers** — brush (3 sizes), eraser, and six stampable stickers
   (stickers exist here only, never on coloring pages).
+- **Brick City** — a 3D brick-built town (three.js). Pick one of six characters, walk the
+  streets in bird's-eye or first-person view, and step through doors into the hospital,
+  shops, schools, houses, and more. 14 houses in the middle; hospital, clothing shop,
+  pre-school, high school, accessory store, ice cream cart, football field, animal
+  sanctuary, and fashion store around the edge. (A build-your-own-city mode is planned
+  as a future tab.)
 
 Merry and Biscuit also hide at the page edges of every non-Home screen — click them for a
 surprise.
@@ -28,9 +34,13 @@ npm run dev       # dev server on http://localhost:5173
 npm run build     # type-check + production build to dist/
 ```
 
+> **IP note**: like the mascots, Brick City is deliberately generic "brick-built" styling —
+> no LEGO name, sets, or minifigure trade dress anywhere.
+
 ## Structure
 
 - `src/data/` — color palette, mixing table, coloring-page region paths
+- `src/city/` — the Brick City 3D game (three.js engine, characters, React screen)
 - `src/lib/` — canvas helpers (strokes, sticker stamping, restore) and localStorage wrappers
 - `src/components/` — header, mascot SVGs, hidden-friend peekers
 - `src/screens/` — one module per screen

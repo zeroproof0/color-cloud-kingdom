@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Header } from './components/Header'
 import { HiddenFriends } from './components/HiddenFriends'
 import { HomeScreen } from './screens/Home'
@@ -7,7 +7,10 @@ import { MixScreen } from './screens/Mix'
 import { ColoringScreen } from './screens/Coloring'
 import { DrawScreen } from './screens/Draw'
 
-export type Screen = 'home' | 'learn' | 'mix' | 'coloring' | 'draw'
+// The 3D engine is heavy — load it only when someone opens Brick City.
+const CityScreen = lazy(() => import('./city/CityScreen'))
+
+export type Screen = 'home' | 'learn' | 'mix' | 'coloring' | 'draw' | 'city'
 
 // Feature toggles from the design handoff.
 export const CONFIG = {
@@ -27,6 +30,17 @@ export function App() {
       {screen === 'mix' && <MixScreen />}
       {screen === 'coloring' && <ColoringScreen />}
       {screen === 'draw' && <DrawScreen />}
+      {screen === 'city' && (
+        <Suspense
+          fallback={
+            <main className="display" style={{ fontWeight: 800, fontSize: 22, color: '#6a4f9e' }}>
+              Building Brick City…
+            </main>
+          }
+        >
+          <CityScreen />
+        </Suspense>
+      )}
       {CONFIG.showHiddenFriends && <HiddenFriends screen={screen} />}
     </div>
   )

@@ -7,6 +7,7 @@ const TABS: Array<{ id: Screen; label: string; dot: string }> = [
   { id: 'mix', label: 'Mixing', dot: '#6db56a' },
   { id: 'coloring', label: 'Coloring', dot: '#5a8fd6' },
   { id: 'draw', label: 'Free Draw', dot: '#9a6fc4' },
+  { id: 'city', label: 'Brick City', dot: '#e4544f' },
 ]
 
 export function Header({ screen, onNavigate }: { screen: Screen; onNavigate: (s: Screen) => void }) {
