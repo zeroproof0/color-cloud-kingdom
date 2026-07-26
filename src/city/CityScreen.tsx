@@ -105,6 +105,7 @@ export default function CityScreen() {
       onPlace: setPlace,
     })
     gameRef.current = game
+    setView('third') // every new game instance starts in bird's-eye
     if (import.meta.env.DEV) {
       ;(window as unknown as { __cityGame?: BrickCityGame }).__cityGame = game
     }
@@ -284,8 +285,9 @@ export default function CityScreen() {
         </button>
       </div>
       <p className="screen-subline" style={{ marginTop: 12 }}>
-        Walk with the arrow keys (or WASD), or use the arrow pad. Walk into a glowing door to go
-        inside — step on the red mat to come back out.
+        {view === 'first'
+          ? 'Turn with ◀ ▶ and walk with ▲ (▼ backs up). Walk into a door to go inside — step on the red mat to come back out.'
+          : 'Walk with the arrow keys (or WASD), or use the arrow pad. Walk into a door to go inside — step on the red mat to come back out.'}
       </p>
     </main>
   )

@@ -210,6 +210,8 @@ export class BrickCityGame {
     return {
       x: this.player.position.x,
       z: this.player.position.z,
+      rot: this.player.rotation.y,
+      view: this.view,
       mode: this.mode,
     }
   }
@@ -724,8 +726,22 @@ export class BrickCityGame {
   private update(dt: number) {
     if (this.doorCooldown > 0) this.doorCooldown -= dt
 
-    let vx = (this.keys.right ? 1 : 0) - (this.keys.left ? 1 : 0)
-    let vz = (this.keys.down ? 1 : 0) - (this.keys.up ? 1 : 0)
+    const rawX = (this.keys.right ? 1 : 0) - (this.keys.left ? 1 : 0)
+    const rawZ = (this.keys.down ? 1 : 0) - (this.keys.up ? 1 : 0)
+    let vx = 0
+    let vz = 0
+    if (this.view === 'first') {
+      // camera-relative: left/right turn, up walks forward, down backs up
+      if (rawX !== 0) this.player.rotation.y -= rawX * 2.8 * dt
+      if (rawZ !== 0) {
+        const r = this.player.rotation.y
+        vx = Math.sin(r) * -rawZ
+        vz = Math.cos(r) * -rawZ
+      }
+    } else {
+      vx = rawX
+      vz = rawZ
+    }
     const moving = vx !== 0 || vz !== 0
     if (moving) {
       const len = Math.hypot(vx, vz)
@@ -758,12 +774,14 @@ export class BrickCityGame {
       if (tryMove(nx, p.z)) p.x = nx
       if (tryMove(p.x, nz)) p.z = nz
 
-      const target = Math.atan2(vx, vz)
-      const cur = this.player.rotation.y
-      let diff = target - cur
-      while (diff > Math.PI) diff -= Math.PI * 2
-      while (diff < -Math.PI) diff += Math.PI * 2
-      this.player.rotation.y = cur + diff * Math.min(1, dt * 14)
+      if (this.view === 'third') {
+        const target = Math.atan2(vx, vz)
+        const cur = this.player.rotation.y
+        let diff = target - cur
+        while (diff > Math.PI) diff -= Math.PI * 2
+        while (diff < -Math.PI) diff += Math.PI * 2
+        this.player.rotation.y = cur + diff * Math.min(1, dt * 14)
+      }
 
       this.walkPhase += dt * 11
       if (this.limbs) {
