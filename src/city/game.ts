@@ -82,7 +82,24 @@ const LAKE_OBSTACLES = [
   { x: 152, z: -5, r: 6 }, // fountain
   { x: 135, z: -15, r: 5.5 }, // anchored sailboats
   { x: 120, z: 100, r: 5.5 },
+  // buoys
+  { x: 128, z: 10, r: 2 },
+  { x: 160, z: 40, r: 2 },
+  { x: 118, z: 55, r: 2 },
+  { x: 163, z: 75, r: 2 },
+  // floating logs
+  { x: 112, z: 115, r: 2.6 },
+  { x: 158, z: 15, r: 2.6 },
+  { x: 130, z: -22, r: 2.6 },
 ]
+
+const JUMP_RAMPS = [
+  { x: 150, z: 82 },
+  { x: 115, z: -8 },
+  { x: 158, z: 112 },
+]
+
+const MONSTER = { x: 138, z: 93, r: 11 }
 
 const FLOOR_NAMES = ['Singing Stage', 'Recording Studio', 'Gaming Room', 'Slide Floor', 'Rooftop Garden']
 
@@ -166,6 +183,14 @@ export class BrickCityGame {
   private ducks: THREE.Group[] = []
   private fountainJet: THREE.Mesh | null = null
   private anchored: THREE.Group[] = []
+  private waveStrips: { mesh: THREE.Mesh; baseX: number; speed: number }[] = []
+  private logs: THREE.Mesh[] = []
+  private monsterSegs: THREE.Group[] = []
+  private splashMesh: THREE.Mesh | null = null
+  private splashAge = 99
+  private airborne = false
+  private vy = 0
+  private jumpCooldown = 0
   private poolWater = { minX: -140, maxX: -110, minZ: 34, maxZ: 56 }
 
   // community center floors
@@ -248,9 +273,10 @@ export class BrickCityGame {
     }
   }
 
-  /** Teleport helper for dev tooling. */
+  /** Teleport helper for dev tooling (moves the boat instead while sailing). */
   debugTeleport(x: number, z: number) {
-    this.player.position.set(x, 0, z)
+    if (this.mode === 'boat') this.boatGroup.position.set(x, 0.2, z)
+    else this.player.position.set(x, 0, z)
   }
 
   /** Switch between the bird's-eye follow camera and first-person view. */
@@ -714,6 +740,91 @@ export class BrickCityGame {
       this.ducks.push(duck)
     }
     this.lakeZones.push({ minX: 110, maxX: 132, minZ: 64, maxZ: 88, message: '🦆 Quack quack! The ducks say hello!', active: false })
+
+    // striped buoys
+    for (const o of LAKE_OBSTACLES.slice(4, 8)) {
+      cylinder(0.9, 1.1, 1.8, '#e4544f', o.x, 0.8, o.z, g, 10)
+      cylinder(0.92, 0.92, 0.5, '#f4f4f0', o.x, 0.9, o.z, g, 10)
+      const light = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), mat('#f5c84c'))
+      light.position.set(o.x, 1.95, o.z)
+      g.add(light)
+    }
+
+    // drifting logs (they roll in place)
+    for (const o of LAKE_OBSTACLES.slice(8)) {
+      const log = cylinder(1, 1, 6, '#8a6a52', o.x, 0.55, o.z, g, 10)
+      log.rotation.z = Math.PI / 2
+      log.rotation.y = (o.x + o.z) % 1.4
+      this.logs.push(log)
+    }
+
+    // jump ramps!
+    for (const r of JUMP_RAMPS) {
+      const ramp = new THREE.Group()
+      ramp.position.set(r.x, 0.3, r.z)
+      const wedge = new THREE.Mesh(new THREE.BoxGeometry(5.4, 0.6, 8), mat('#f28c3b'))
+      wedge.rotation.x = 0.4
+      wedge.position.y = 1.4
+      ramp.add(wedge)
+      box(0.5, 0.4, 8, '#f4f4f0', -2.7, 1.6, 0, ramp)
+      box(0.5, 0.4, 8, '#f4f4f0', 2.7, 1.6, 0, ramp)
+      const wedge2 = ramp.children[1] as THREE.Mesh
+      wedge2.rotation.x = 0.4
+      const wedge3 = ramp.children[2] as THREE.Mesh
+      wedge3.rotation.x = 0.4
+      g.add(ramp)
+      textSprite('Jump!', g, r.x, 7, r.z, 0.7)
+    }
+
+    // rolling wave foam
+    const waveGeo = new THREE.BoxGeometry(7, 0.1, 1.1)
+    for (let i = 0; i < 14; i++) {
+      const foam = new THREE.Mesh(waveGeo, new THREE.MeshLambertMaterial({ color: '#e8f4fb', transparent: true, opacity: 0.5 }))
+      const wz = LAKE.minZ + 6 + ((i * 37) % (LAKE.maxZ - LAKE.minZ - 12))
+      foam.position.set(LAKE.minX + ((i * 23) % 60), 0.22, wz)
+      g.add(foam)
+      this.waveStrips.push({ mesh: foam, baseX: (i * 23) % 60, speed: 2 + (i % 3) })
+    }
+
+    // Bubbles, the friendly lake monster (swims a slow circle)
+    for (let s = 0; s < 4; s++) {
+      const seg = new THREE.Group()
+      if (s === 0) {
+        box(2.4, 2.2, 2.6, '#4e9a4e', 0, 2.6, 0, seg) // head
+        box(1.6, 1.4, 1.4, '#4e9a4e', 0, 1, -0.4, seg) // neck
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.34, 8, 6), mat('#fffdf8'))
+        eyeL.position.set(-0.7, 3, 1.1)
+        seg.add(eyeL)
+        const eyeR = eyeL.clone()
+        eyeR.position.x = 0.7
+        seg.add(eyeR)
+        const pupL = new THREE.Mesh(new THREE.SphereGeometry(0.16, 6, 6), mat('#3a3440'))
+        pupL.position.set(-0.7, 3, 1.38)
+        seg.add(pupL)
+        const pupR = pupL.clone()
+        pupR.position.x = 0.7
+        seg.add(pupR)
+        box(1, 0.3, 0.6, '#f2a0bd', 0, 1.9, 1.34, seg) // smile
+      } else {
+        const hump = new THREE.Mesh(new THREE.SphereGeometry(1.7 - s * 0.18, 12, 10), mat('#4e9a4e'))
+        hump.position.y = 0.5
+        seg.add(hump)
+      }
+      this.monsterSegs.push(seg)
+      g.add(seg)
+    }
+    this.lakeZones.push({
+      minX: MONSTER.x - 18, maxX: MONSTER.x + 18, minZ: MONSTER.z - 18, maxZ: MONSTER.z + 18,
+      message: "🐉 It's Bubbles the friendly lake monster! Don't bump his humps!", active: false,
+    })
+
+    // splash effect for jump landings
+    this.splashMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(2, 2.4, 0.25, 16),
+      new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.8 }),
+    )
+    this.splashMesh.visible = false
+    g.add(this.splashMesh)
 
     // sandcastle beach on the west shore
     box(14, 0.24, 40, '#eadbb0', 98, 0.12, 88, g)
@@ -1198,6 +1309,40 @@ export class BrickCityGame {
     if (this.mode !== 'boat' && this.boatGroup) {
       this.boatGroup.position.y = 0.2 + Math.sin(t * 1.6) * 0.1
     }
+    // foam strips drift east and wrap
+    for (const w of this.waveStrips) {
+      w.mesh.position.x = LAKE.minX + 3 + ((w.baseX + t * w.speed) % (LAKE.maxX - LAKE.minX - 8))
+      w.mesh.position.y = 0.22 + Math.sin(t * 2 + w.baseX) * 0.05
+    }
+    this.logs.forEach((log, i) => {
+      log.rotation.x += 0.003 + i * 0.001
+      log.position.y = 0.55 + Math.sin(t * 1.4 + i * 2) * 0.1
+    })
+    // Bubbles swims a slow circle, head leading three humps
+    this.monsterSegs.forEach((seg, s) => {
+      const a = t * 0.22 - s * 0.24
+      seg.position.set(
+        MONSTER.x + Math.cos(a) * MONSTER.r,
+        Math.sin(t * 1.8 + s * 1.3) * 0.25 - (s === 0 ? 0 : 0.2),
+        MONSTER.z + Math.sin(a) * MONSTER.r,
+      )
+      if (s === 0) seg.rotation.y = Math.atan2(-Math.sin(a), Math.cos(a)) + Math.PI / 2 + Math.PI
+    })
+    // expanding splash ring after a jump landing
+    if (this.splashMesh && this.splashAge < 0.6) {
+      this.splashAge += 0.016
+      const k = this.splashAge / 0.6
+      this.splashMesh.visible = true
+      this.splashMesh.scale.set(1 + k * 2.2, 1, 1 + k * 2.2)
+      ;(this.splashMesh.material as THREE.MeshLambertMaterial).opacity = 0.8 * (1 - k)
+    } else if (this.splashMesh) {
+      this.splashMesh.visible = false
+    }
+  }
+
+  /** Water height under the boat — waves make it roll. */
+  private waveY(x: number, z: number) {
+    return 0.2 + Math.sin(this.t * 1.7 + x * 0.12) * 0.14 + Math.sin(this.t * 1.1 + z * 0.09) * 0.1
   }
 
   private boardBoat() {
@@ -1209,24 +1354,57 @@ export class BrickCityGame {
   }
 
   private updateBoat(dt: number) {
+    if (this.jumpCooldown > 0) this.jumpCooldown -= dt
     const rawX = (this.keys.right ? 1 : 0) - (this.keys.left ? 1 : 0)
     const rawZ = (this.keys.down ? 1 : 0) - (this.keys.up ? 1 : 0)
     this.boatRot -= rawX * 1.9 * dt
     const thr = -rawZ
     const b = this.boatGroup.position
+
+    // Bubbles is a moving obstacle — block against his current segments too
+    const blocked = (x: number, z: number) =>
+      LAKE_OBSTACLES.some((o) => (x - o.x) ** 2 + (z - o.z) ** 2 < (o.r + 2.5) ** 2) ||
+      this.monsterSegs.some((seg) => (x - seg.position.x) ** 2 + (z - seg.position.z) ** 2 < 5.3 ** 2)
+
     if (thr !== 0) {
       const step = 20 * dt * thr
       const nx = THREE.MathUtils.clamp(b.x + Math.sin(this.boatRot) * step, LAKE.minX + 4, LAKE.maxX - 4)
       const nz = THREE.MathUtils.clamp(b.z + Math.cos(this.boatRot) * step, LAKE.minZ + 4, LAKE.maxZ - 4)
-      const blocked = (x: number, z: number) =>
-        LAKE_OBSTACLES.some((o) => (x - o.x) ** 2 + (z - o.z) ** 2 < (o.r + 2.5) ** 2)
       if (!blocked(nx, b.z)) b.x = nx
       if (!blocked(b.x, nz)) b.z = nz
     }
-    b.y = 0.2 + Math.sin(this.t * 1.7) * 0.12
+
+    // ramps launch the boat when hit under throttle
+    if (!this.airborne && this.jumpCooldown <= 0 && thr > 0) {
+      for (const r of JUMP_RAMPS) {
+        if ((b.x - r.x) ** 2 + (b.z - r.z) ** 2 < 18) {
+          this.airborne = true
+          this.vy = 13
+          this.jumpCooldown = 2
+          this.toast('🚤 Air time! Woohoo!', 1800)
+          break
+        }
+      }
+    }
+
+    if (this.airborne) {
+      b.y += this.vy * dt
+      this.vy -= 28 * dt
+      const water = this.waveY(b.x, b.z)
+      if (this.vy < 0 && b.y <= water) {
+        b.y = water
+        this.airborne = false
+        this.splashAge = 0
+        if (this.splashMesh) this.splashMesh.position.set(b.x, 0.25, b.z)
+        this.toast('💦 SPLASH! What a landing!', 2200)
+      }
+      this.boatGroup.rotation.x += ((this.vy > 0 ? -0.3 : 0.22) - this.boatGroup.rotation.x) * Math.min(1, dt * 5)
+    } else {
+      b.y = this.waveY(b.x, b.z)
+      this.boatGroup.rotation.x += (((thr !== 0 ? -0.035 : 0) + Math.sin(this.t * 1.4 + b.x * 0.1) * 0.045) - this.boatGroup.rotation.x) * Math.min(1, dt * 4)
+    }
     this.boatGroup.rotation.y = this.boatRot
-    this.boatGroup.rotation.z += ((-rawX * 0.07) - this.boatGroup.rotation.z) * Math.min(1, dt * 6)
-    this.boatGroup.rotation.x += ((thr !== 0 ? -0.035 : 0) - this.boatGroup.rotation.x) * Math.min(1, dt * 4)
+    this.boatGroup.rotation.z += (((-rawX * 0.07) + Math.sin(this.t * 1.2 + b.z * 0.08) * 0.04) - this.boatGroup.rotation.z) * Math.min(1, dt * 6)
 
     // the captain stands at the wheel
     this.player.position.set(
@@ -1250,10 +1428,12 @@ export class BrickCityGame {
     // hop off back at the dock
     const dockDist2 = (b.x - BOAT_PARK.x) ** 2 + (b.z - BOAT_PARK.z) ** 2
     if (dockDist2 > 324) this.leftDock = true
-    if (this.doorCooldown <= 0 && this.leftDock && dockDist2 < 81) {
+    if (this.doorCooldown <= 0 && this.leftDock && dockDist2 < 30) {
       this.boatGroup.position.set(BOAT_PARK.x, 0.2, BOAT_PARK.z)
       this.boatGroup.rotation.set(0, Math.PI / 2, 0)
       this.boatRot = Math.PI / 2
+      this.airborne = false
+      this.vy = 0
       this.mode = 'city'
       this.player.position.set(110, 0, 20)
       this.player.rotation.y = -Math.PI / 2
