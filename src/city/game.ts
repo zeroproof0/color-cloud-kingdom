@@ -70,33 +70,54 @@ const HOUSE_COLORS = [
 
 const PLAYER_RADIUS = 1.1
 const PLAYER_SPEED = 16
-const BOUND_X = 170
-const BOUND_Z = 140
 
 // the lake occupies the whole east side of the expanded map
-const LAKE = { minX: 105, maxX: 170, minZ: -30, maxZ: 130 }
+// 5× lake: 200 × 260 across the whole east side of the map
+const LAKE = { minX: 105, maxX: 305, minZ: -30, maxZ: 230 }
 const DOCK_END = { x: 113.5, z: 20 }
 const BOAT_PARK = { x: 118, z: 26 }
+const BOUNDS = { minX: -175, maxX: 300, minZ: -190, maxZ: 235 }
+
+const BUOYS = [
+  { x: 128, z: 10, r: 2 },
+  { x: 160, z: 40, r: 2 },
+  { x: 118, z: 55, r: 2 },
+  { x: 163, z: 75, r: 2 },
+  { x: 200, z: 90, r: 2 },
+  { x: 255, z: 165, r: 2 },
+]
+const LOGS = [
+  { x: 112, z: 115, r: 2.6 },
+  { x: 158, z: 15, r: 2.6 },
+  { x: 130, z: -22, r: 2.6 },
+  { x: 235, z: -5, r: 2.6 },
+]
+
+const TITANIC = { x: 220, z: 130, rot: -0.5 }
+// four collision circles along the hull axis (precomputed for rot -0.5)
+const TITANIC_HULL = [
+  { x: 235.8, z: 101, r: 13 },
+  { x: 225.3, z: 120.3, r: 13 },
+  { x: 214.7, z: 139.7, r: 13 },
+  { x: 204.2, z: 159, r: 13 },
+]
+
 const LAKE_OBSTACLES = [
   { x: 140, z: 55, r: 14 }, // treasure island
   { x: 152, z: -5, r: 6 }, // fountain
   { x: 135, z: -15, r: 5.5 }, // anchored sailboats
   { x: 120, z: 100, r: 5.5 },
-  // buoys
-  { x: 128, z: 10, r: 2 },
-  { x: 160, z: 40, r: 2 },
-  { x: 118, z: 55, r: 2 },
-  { x: 163, z: 75, r: 2 },
-  // floating logs
-  { x: 112, z: 115, r: 2.6 },
-  { x: 158, z: 15, r: 2.6 },
-  { x: 130, z: -22, r: 2.6 },
+  ...BUOYS,
+  ...LOGS,
+  ...TITANIC_HULL,
 ]
 
 const JUMP_RAMPS = [
   { x: 150, z: 82 },
   { x: 115, z: -8 },
   { x: 158, z: 112 },
+  { x: 240, z: 40 },
+  { x: 185, z: 195 },
 ]
 
 const MONSTER = { x: 138, z: 93, r: 11 }
@@ -188,6 +209,9 @@ export class BrickCityGame {
   private monsterSegs: THREE.Group[] = []
   private splashMesh: THREE.Mesh | null = null
   private splashAge = 99
+  private titanic: THREE.Group | null = null
+  private titanicPhase = 0
+  private titanicFoam: THREE.Mesh[] = []
   private airborne = false
   private vy = 0
   private jumpCooldown = 0
@@ -270,6 +294,9 @@ export class BrickCityGame {
       rot: this.player.rotation.y,
       view: this.view,
       mode: this.mode,
+      cooldown: this.doorCooldown,
+      t: this.t,
+      titanicPhase: this.titanicPhase,
     }
   }
 
@@ -321,8 +348,8 @@ export class BrickCityGame {
   private buildCity() {
     const g = this.cityGroup
 
-    const ground = new THREE.Mesh(new THREE.BoxGeometry(360, 2, 300), mat('#7cbf6b'))
-    ground.position.y = -1
+    const ground = new THREE.Mesh(new THREE.BoxGeometry(490, 2, 440), mat('#7cbf6b'))
+    ground.position.set(65, -1, 20)
     g.add(ground)
 
     // roads: central E–W street + ring road
@@ -742,7 +769,7 @@ export class BrickCityGame {
     this.lakeZones.push({ minX: 110, maxX: 132, minZ: 64, maxZ: 88, message: '🦆 Quack quack! The ducks say hello!', active: false })
 
     // striped buoys
-    for (const o of LAKE_OBSTACLES.slice(4, 8)) {
+    for (const o of BUOYS) {
       cylinder(0.9, 1.1, 1.8, '#e4544f', o.x, 0.8, o.z, g, 10)
       cylinder(0.92, 0.92, 0.5, '#f4f4f0', o.x, 0.9, o.z, g, 10)
       const light = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), mat('#f5c84c'))
@@ -751,7 +778,7 @@ export class BrickCityGame {
     }
 
     // drifting logs (they roll in place)
-    for (const o of LAKE_OBSTACLES.slice(8)) {
+    for (const o of LOGS) {
       const log = cylinder(1, 1, 6, '#8a6a52', o.x, 0.55, o.z, g, 10)
       log.rotation.z = Math.PI / 2
       log.rotation.y = (o.x + o.z) % 1.4
@@ -778,7 +805,7 @@ export class BrickCityGame {
 
     // rolling wave foam
     const waveGeo = new THREE.BoxGeometry(7, 0.1, 1.1)
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 30; i++) {
       const foam = new THREE.Mesh(waveGeo, new THREE.MeshLambertMaterial({ color: '#e8f4fb', transparent: true, opacity: 0.5 }))
       const wz = LAKE.minZ + 6 + ((i * 37) % (LAKE.maxZ - LAKE.minZ - 12))
       foam.position.set(LAKE.minX + ((i * 23) % 60), 0.22, wz)
@@ -818,6 +845,8 @@ export class BrickCityGame {
       message: "🐉 It's Bubbles the friendly lake monster! Don't bump his humps!", active: false,
     })
 
+    this.buildTitanic()
+
     // splash effect for jump landings
     this.splashMesh = new THREE.Mesh(
       new THREE.CylinderGeometry(2, 2.4, 0.25, 16),
@@ -834,6 +863,79 @@ export class BrickCityGame {
     box(1.2, 1.6, 1.2, '#e8cf9a', 97.8, 3, 92.9, g)
     box(1.2, 2.4, 1.2, '#e8cf9a', 100.2, 3.4, 95.1, g)
     this.zones.push({ minX: 91, maxX: 105, minZ: 68, maxZ: 108, message: '🏖️ Beach day! Look at that sandcastle!', active: false })
+  }
+
+  /** A big friendly Titanic. She sinks (and pops back up) when the boat sails near. */
+  private buildTitanic() {
+    const s = new THREE.Group()
+    s.position.set(TITANIC.x, 0.2, TITANIC.z)
+    s.rotation.y = TITANIC.rot
+
+    // hull: black sides, red below the waterline, white strake on top (bow at -z)
+    box(14, 10, 86, '#1f1f2a', 0, 3.5, 0, s)
+    box(14.5, 2.4, 86.5, '#8e3230', 0, -0.6, 0, s)
+    box(14.2, 1.1, 86.2, '#f4f4f0', 0, 7.8, 0, s)
+    // porthole strips along each side
+    box(0.25, 0.7, 68, '#3a3440', -7.15, 5.6, 0, s)
+    box(0.25, 0.7, 68, '#3a3440', 7.15, 5.6, 0, s)
+    // tapered bow and rounded stern
+    box(10, 10, 8, '#1f1f2a', 0, 3.5, -46, s)
+    box(6, 10, 6, '#1f1f2a', 0, 3.5, -52, s)
+    box(2.6, 9, 4, '#1f1f2a', 0, 3.9, -56, s)
+    box(10, 10, 6, '#1f1f2a', 0, 3.5, 45, s)
+    box(6, 9, 4, '#1f1f2a', 0, 3.9, 49, s)
+
+    // white superstructure decks
+    box(11, 2.6, 62, '#f7f3ec', 0, 9.8, 1, s)
+    box(9, 2.6, 56, '#f4f4f0', 0, 12.4, 1, s)
+    box(7.5, 2.4, 44, '#f7f3ec', 0, 14.9, 0, s)
+    box(8.2, 2.4, 6, '#f4f4f0', 0, 14.9, -24, s) // bridge
+    // deck window strips
+    box(11.2, 0.6, 58, '#5a5a64', 0, 10.1, 1, s)
+    box(9.2, 0.6, 52, '#5a5a64', 0, 12.7, 1, s)
+
+    // four raked buff funnels with black tops
+    for (let i = 0; i < 4; i++) {
+      const fz = -16 + i * 11
+      const funnel = cylinder(2.2, 2.6, 8.5, '#d9a566', 0, 20, fz, s, 14)
+      funnel.rotation.x = 0.1
+      const cap = cylinder(2.25, 2.25, 1.5, '#22222a', 0, 24.2, fz + 0.45, s, 14)
+      cap.rotation.x = 0.1
+    }
+
+    // masts with crow's nest and flags
+    cylinder(0.22, 0.3, 15, '#c99a52', 0, 15, -36, s, 8)
+    box(1.5, 1.3, 1.5, '#c99a52', 0, 18.5, -36, s)
+    box(1.8, 1.1, 0.15, '#e4544f', 0.95, 22, -36, s)
+    cylinder(0.2, 0.28, 12, '#c99a52', 0, 14, 38, s, 8)
+    box(1.8, 1.1, 0.15, '#5a8fd6', 0.95, 19.5, 38, s)
+
+    // lifeboats along the boat deck
+    for (let i = 0; i < 5; i++) {
+      const lz = -18 + i * 10
+      box(1.7, 1, 4.2, '#f4f4f0', -6.1, 12, lz, s)
+      box(1.7, 1, 4.2, '#f4f4f0', 6.1, 12, lz, s)
+    }
+
+    // sinking foam along the waterline (hidden until she goes down)
+    for (let i = 0; i < 4; i++) {
+      const foam = new THREE.Mesh(
+        new THREE.CylinderGeometry(9 + i * 1.5, 9 + i * 1.5, 0.18, 18),
+        new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0 }),
+      )
+      foam.position.set(TITANIC.x + Math.sin(TITANIC.rot) * (-30 + i * 20), 0.24, TITANIC.z + Math.cos(TITANIC.rot) * (-30 + i * 20))
+      this.cityGroup.add(foam)
+      this.titanicFoam.push(foam)
+    }
+
+    textSprite('R.M.S. Titanic', this.cityGroup, TITANIC.x, 34, TITANIC.z, 1.3)
+    this.titanic = s
+    this.cityGroup.add(s)
+    this.lakeZones.push({
+      minX: TITANIC.x - 55, maxX: TITANIC.x + 55, minZ: TITANIC.z - 55, maxZ: TITANIC.z + 55,
+      message: "🚢 Oh no — the Titanic is sinking! Glub glub… don't worry, she always pops back up!",
+      active: false,
+    })
   }
 
   private buildBoat(color: string): THREE.Group {
@@ -1289,9 +1391,30 @@ export class BrickCityGame {
     this.renderer.render(this.scene, this.camera)
   }
 
-  /** Ambient life: bobbing boats, the fountain jet, paddling ducks. */
-  private animateWorld() {
+  /** Ambient life: bobbing boats, the fountain jet, paddling ducks, a sinking ship. */
+  private animateWorld(dt: number) {
     const t = this.t
+
+    // the Titanic sinks while the boat is nearby, refloats when it leaves
+    if (this.titanic) {
+      const b = this.boatGroup?.position
+      const near =
+        this.mode === 'boat' && b !== undefined &&
+        (b.x - TITANIC.x) ** 2 + (b.z - TITANIC.z) ** 2 < 70 ** 2
+      // sinking takes ~8s, refloating ~5s
+      const step = near ? dt / 8 : -dt / 5
+      this.titanicPhase = THREE.MathUtils.clamp(this.titanicPhase + step, 0, 1)
+      const e = this.titanicPhase * this.titanicPhase * (3 - 2 * this.titanicPhase)
+      this.titanic.position.y = 0.2 - 12 * e + Math.sin(t * 1.1) * 0.18 * (1 - e)
+      this.titanic.rotation.x = -0.42 * e // bow dips first
+      this.titanic.rotation.z = 0.09 * e + Math.sin(t * 0.9) * 0.015 * (1 - e)
+      for (const foam of this.titanicFoam) {
+        const m = foam.material as THREE.MeshLambertMaterial
+        m.opacity = e * (0.35 + 0.2 * Math.sin(t * 5 + foam.position.x))
+        foam.scale.setScalar(1 + e * 0.5 + 0.08 * Math.sin(t * 4 + foam.position.z))
+        foam.scale.y = 1
+      }
+    }
     this.ducks.forEach((duck, i) => {
       const a = t * 0.4 + i * 2.09
       duck.position.set(121 + Math.cos(a) * 7, 0.05, 76 + Math.sin(a) * 7)
@@ -1446,7 +1569,7 @@ export class BrickCityGame {
   private update(dt: number) {
     if (this.doorCooldown > 0) this.doorCooldown -= dt
     this.t += dt
-    this.animateWorld()
+    this.animateWorld(dt)
 
     if (this.mode === 'boat') {
       this.updateBoat(dt)
@@ -1497,8 +1620,8 @@ export class BrickCityGame {
       let nx = p.x + vx * PLAYER_SPEED * dt
       let nz = p.z + vz * PLAYER_SPEED * dt
       if (this.mode === 'city') {
-        nx = THREE.MathUtils.clamp(nx, -BOUND_X, BOUND_X)
-        nz = THREE.MathUtils.clamp(nz, -BOUND_Z, BOUND_Z)
+        nx = THREE.MathUtils.clamp(nx, BOUNDS.minX, BOUNDS.maxX)
+        nz = THREE.MathUtils.clamp(nz, BOUNDS.minZ, BOUNDS.maxZ)
       } else if (this.interiorGroup) {
         const cw = this.interiorGroup.userData.clampW as number
         const cd = this.interiorGroup.userData.clampD as number
